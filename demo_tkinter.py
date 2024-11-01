@@ -51,6 +51,7 @@ class TextPopupApp:
     # New method to directly show summary window
     def generate_summary_direct(self, text):
         summary_popup = tk.Toplevel(self.root)
+        summary_popup.withdraw()  # Hide the window initially
         self.active_popups.append(summary_popup)
         summary_popup.title("Summary")
         summary_popup.configure(bg='#f6f8fa')  # Very light blue-gray background
@@ -122,16 +123,58 @@ class TextPopupApp:
         )
         summary_label.pack(padx=15, pady=(5,12), anchor='w')
         
-        # Position the window near mouse cursor
+        # Add button frame right away
+        button_frame = tk.Frame(summary_popup, bg='#f6f8fa')
+        button_frame.pack(fill=tk.X, padx=20, pady=(10, 20))
+        
+        # Add styled "Draft Reply?" button using tkmacosx
+        draft_btn = Button(
+            button_frame, 
+            text="✏️   Draft Reply",
+            command=lambda: [
+                self.show_draft_input(summary_popup.winfo_x(), summary_popup.winfo_y(), summary_popup.winfo_width()),
+                summary_popup.destroy()
+            ],
+            font=('Segoe UI', 14),
+            bg='#0066FF',
+            fg='white',
+            activebackground='#0052CC',
+            activeforeground='white',
+            borderless=True,
+            focuscolor='',
+            padx=25,
+            pady=10,
+            cursor='hand2'
+        )
+        draft_btn.pack(side=tk.BOTTOM, pady=(10, 0))
+        
+        # Position the window before showing content
+        summary_popup.update_idletasks()  # Ensure window dimensions are calculated
+        popup_width = summary_popup.winfo_width()
+        popup_height = summary_popup.winfo_height()
+        
+        # Get mouse position and screen dimensions
         mouse_x = self.root.winfo_pointerx()
         mouse_y = self.root.winfo_pointery()
-        summary_popup.geometry(f"+{mouse_x}+{mouse_y}")
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        
+        # Calculate x position ensuring window is fully visible
+        x = min(max(mouse_x - popup_width//2, 0), screen_width - popup_width)
+        
+        # For y position, if mouse is in lower half of screen, position window above cursor
+        if mouse_y > screen_height / 2:
+            y = max(mouse_y - popup_height - 20, 0)  # Position above cursor with 20px gap
+        else:
+            y = min(mouse_y + 20, screen_height - popup_height)  # Position below cursor with 20px gap
+        
+        summary_popup.geometry(f"+{x}+{y}")
+        summary_popup.deiconify()  # Show the window in its correct position
         
         def summarize(input_text):
             for output in self.summarizer.process(input_text):
                 self.root.after(0, lambda t=output: summary_label.config(text=t))
             self.last_summary = output
-            summary_popup.after(0, lambda: self.finalize_summary_popup(summary_popup))
         
         threading.Thread(target=lambda: summarize(text), daemon=True).start()
 
@@ -159,71 +202,12 @@ class TextPopupApp:
                 pass  # Popup might already be destroyed
         self.active_popups = []
 
-    def generate_summary(self, text):
-        popup_position = self.popup_position  # Store position before destroying
-        self.popup.destroy()  # Close the initial popup
-        
-        # Create a new popup for the summary
-        summary_popup = tk.Toplevel(self.root)
-        self.active_popups.append(summary_popup)  # Track this popup
-        summary_popup.title("Summary")
-        
-        # Create summary label right away
-        summary_label = tk.Label(summary_popup, text="Generating summary...", wraplength=300)
-        summary_label.pack(padx=10, pady=10)
-        
-        # Position the summary popup at the same location as the original
-        summary_popup.geometry(f"+{popup_position[0]}+{popup_position[1]}")
-        
-        def summarize(input_text):
-            for output in self.summarizer.process(input_text):
-                self.root.after(0, lambda t=output: summary_label.config(text=t))
-            self.last_summary = output
-            summary_popup.after(0, lambda: self.finalize_summary_popup(summary_popup))
-        
-        # Pass the text parameter to summarize
-        threading.Thread(target=lambda: summarize(text), daemon=True).start()
-
-    def finalize_summary_popup(self, popup):
-        # Position window
-        popup.update_idletasks()
-        mouse_x = self.root.winfo_pointerx()
-        mouse_y = self.root.winfo_pointery()
-        popup_width = popup.winfo_width()
-        popup_height = popup.winfo_height()
-        popup.geometry(f"+{mouse_x-popup_width//2}+{mouse_y-popup_height//2}")
-        
-        # Create button frame with matching background
-        button_frame = tk.Frame(popup, bg='#f6f8fa')
-        button_frame.pack(fill=tk.X, padx=20, pady=(10, 20))
-        
-        # Add styled "Draft Reply?" button using tkmacosx
-        draft_btn = Button(
-            button_frame, 
-            text="✏️   Draft Reply",
-            command=lambda: [
-                self.show_draft_input(popup.winfo_x(), popup.winfo_y()),
-                popup.destroy()
-            ],
-            font=('Segoe UI', 14),
-            bg='#0066FF',
-            fg='white',
-            activebackground='#0052CC',
-            activeforeground='white',
-            borderless=True,  # Remove border
-            focuscolor='',   # Remove focus ring
-            padx=25,
-            pady=10,
-            cursor='hand2'
-        )
-        draft_btn.pack(side=tk.BOTTOM, pady=(10, 0))
-
-    def show_draft_input(self, x, y):
-        # Create new popup for draft input
+    def show_draft_input(self, summary_x, summary_y, summary_width):
         draft_popup = tk.Toplevel(self.root)
+        draft_popup.withdraw()  # Hide initially
         self.active_popups.append(draft_popup)
         draft_popup.title("Draft Reply")
-        draft_popup.configure(bg='#f6f8fa')  # Light blue-gray background
+        draft_popup.configure(bg='#f6f8fa')
         
         # Create frame for the three columns
         columns_frame = tk.Frame(draft_popup, bg='#f6f8fa')
@@ -345,15 +329,28 @@ class TextPopupApp:
         )
         improve_btn.pack(pady=(0, 12))
         
-        # Position window
+        # Position window relative to the summary window's position
         draft_popup.update_idletasks()
         screen_width = draft_popup.winfo_screenwidth()
         screen_height = draft_popup.winfo_screenheight()
         popup_width = draft_popup.winfo_width()
+        if popup_width == 1:
+            popup_width = 800
         popup_height = draft_popup.winfo_height()
-        x = (screen_width - popup_width) // 2
-        y = (screen_height - popup_height) // 2
-        draft_popup.geometry(f"+{x}+{y}")
+        
+        # Calculate center point of the summary window
+        summary_center_x = summary_x + summary_width//2
+        
+        # Center the new window on the same point, but ensure it stays on screen
+        new_x = max(min(max(summary_center_x - popup_width//2, 0), screen_width - popup_width), 0)
+        # Position vertically based on screen space available
+        if summary_y > screen_height / 2:
+            new_y = max(summary_y - popup_height - 10, 0)  # 10px gap above summary
+        else:
+            new_y = min(summary_y + 10, screen_height - popup_height)  # 10px gap below summary
+        
+        draft_popup.geometry(f"+{new_x}+{new_y}")
+        draft_popup.deiconify()  # Show in correct position
 
     def generate_improved_text(self, text, improved_text_widget):
         # Get reference to the improve button
