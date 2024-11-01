@@ -1,28 +1,29 @@
-import platform
 from abc import ABC, abstractmethod
 from typing import Generator, List, Dict, Any, Union, Tuple
+from llama_cpp import Llama
 
 class SmolTool(ABC):
-    def __init__(self, model_repo: str, model_filename: str, system_prompt: str, prefix_text: str = "", n_ctx: int = 2048):
+    # Class-level cache for model instances
+    _model_cache: Dict[Tuple[str, str], Llama] = {}
+
+    def __init__(self, model_repo: str, model_filename: str, system_prompt: str, prefix_text: str = "", n_ctx: int = 8192):
         self.system_prompt = system_prompt
         self.prefix_text = prefix_text
-        self.is_mac = platform.system() == "Darwin"
-        self._load_model(model_repo, model_filename, n_ctx)
         
-
-    def _load_model(self, model_repo: str, model_filename: str, n_ctx: int):
-        if self.is_mac:
-            from mlx_lm import load, stream_generate
-            self.model, self.tokenizer = load(model_repo)
-        else:
-            from llama_cpp import Llama
-            self.model = Llama.from_pretrained(
+        # Create a cache key from the model repo and filename
+        cache_key = (model_repo, model_filename)
+        
+        # Try to get the model from cache, or create and cache a new one
+        if cache_key not in self._model_cache:
+            print(f"Loading model {model_filename} from {model_repo}...")
+            self._model_cache[cache_key] = Llama.from_pretrained(
                 repo_id=model_repo,
                 filename=model_filename,
                 n_ctx=n_ctx,
                 verbose=False
             )
         
+        self.model = self._model_cache[cache_key]
         self._warm_up()
 
     def _warm_up(self):
@@ -39,24 +40,6 @@ class SmolTool(ABC):
         """Process the input text and yield results as they're generated"""
         pass
 
-    def _create_mlx_completion(
-        self,
-        messages: List[Dict[str, str]],
-        temperature: float = 0.4,
-        top_p: float = 0.9,
-        top_k: int = 50,
-        repeat_penalty: float = 1.2,
-        stop_sequences: List[str] = ["<end_action>", "<|endoftext|>"]
-    ) -> Generator[str, None, None]:
-        """Helper method for MLX chat completions"""
-        prompt = self.tokenizer.apply_chat_template(messages, tokenize=False)
-        output = ""
-        for token in stream_generate(self.model, self.tokenizer, prompt=prompt, temp=temperature, top_p=top_p, repetition_penalty=repeat_penalty):
-            output += token
-            if token in stop_sequences:
-                break
-            yield output
-
     def _create_chat_completion(
         self, 
         messages: List[Dict[str, str]], 
@@ -67,10 +50,6 @@ class SmolTool(ABC):
         max_tokens: int = 256
     ) -> Generator[str, None, None]:
         """Helper method to create chat completions with standard parameters"""
-        if self.is_mac:
-            yield from self._create_mlx_completion(messages)
-            return
-
         output = ""
         for chunk in self.model.create_chat_completion(
             messages=messages,

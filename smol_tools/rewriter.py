@@ -4,7 +4,7 @@ from typing import Generator
 class SmolRewriter(SmolTool):
     def __init__(self):
         super().__init__(
-            model_repo="andito/SmolLM2-1.7B-8k-dpo-F16-GGUF",
+            model_repo="andito/SmolLM2-1.7B-Instruct-F16-GGUF",
             model_filename="smollm2-1.7b-8k-dpo-f16.gguf",
             system_prompt="You are an AI writing assistant. Your task is to rewrite the user's email to make it more professional and approachable while maintaining its main points and key message. Do not return any text other than the rewritten message.",
             prefix_text="Rewrite the message below to make it more professional and approachable while maintaining its main points and key message. Do not add any new information or return any text other than the rewritten message\nThe message:"

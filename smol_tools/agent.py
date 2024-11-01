@@ -66,8 +66,8 @@ class SmolToolAgent(SmolTool):
         self.toolbox = {tool.name: tool for tool in self.tools}
         self.json_code_agent = CodeAgent(tools=self.tools, llm_engine=self.llm_engine, system_prompt=self._get_system_prompt())
         super().__init__(
-            model_repo="andito/SmolLM2-1.7B-Intermediate-SFT-v2-lr1e5-FC-F16-GGUF",
-            model_filename="smollm2-1.7b-intermediate-sft-v2-lr1e5-fc-f16.gguf",
+            model_repo="andito/SmolLM2-1.7B-Instruct-F16-GGUF",
+            model_filename="smollm2-1.7b-8k-dpo-f16.gguf",
             system_prompt=self._get_system_prompt(),
             prefix_text=""
         )

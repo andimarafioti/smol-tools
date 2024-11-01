@@ -4,7 +4,7 @@ from typing import Generator
 class SmolSummarizer(SmolTool):
     def __init__(self):
         super().__init__(
-            model_repo="andito/SmolLM2-1.7B-8k-dpo-F16-GGUF",
+            model_repo="andito/SmolLM2-1.7B-Instruct-F16-GGUF",
             model_filename="smollm2-1.7b-8k-dpo-f16.gguf",
             system_prompt="Concisely summarize the main points of the input text in up to three sentences, focusing on key information and events.",
         )
