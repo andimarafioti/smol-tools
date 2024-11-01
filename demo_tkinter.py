@@ -168,10 +168,9 @@ class TextPopupApp:
         columns_frame.pack(expand=True, fill='both', padx=10, pady=5)
         
         # Calculate required height based on summary content
-        # Each line is roughly 20-25 pixels, add some padding
         num_lines = len(self.last_summary.split('\n'))
-        line_height = max(num_lines * 1.5, 10)  # Minimum 10 lines, multiply by 1.5 for comfort
-        widget_height = min(line_height, 20)  # Maximum 20 lines
+        line_height = max(num_lines * 1.5, 15)
+        widget_height = min(line_height, 40) 
         
         # Column 1: Original Summary
         summary_frame = tk.Frame(columns_frame)
@@ -196,6 +195,11 @@ class TextPopupApp:
         improved_text = tk.Text(improved_frame, height=widget_height, width=30, wrap=tk.WORD)
         improved_text.pack(fill='both', expand=True)
         improved_text.config(state='disabled')
+        
+        # Add Copy button for improved text
+        copy_btn = tk.Button(improved_frame, text="Copy", 
+                           command=lambda: pyperclip.copy(improved_text.get("1.0", "end-1c")))
+        copy_btn.pack(pady=5)
         
         # Add "Smol Improvement?" button below the middle column
         improve_btn = tk.Button(input_frame, text="Smol Improvement?", 
