@@ -172,8 +172,11 @@ class TextPopupApp:
         summary_popup.deiconify()  # Show the window in its correct position
         
         def summarize(input_text):
-            for output in self.summarizer.process(input_text):
-                self.root.after(0, lambda t=output: summary_label.config(text=t))
+            try:
+                for output in self.summarizer.process(input_text):
+                    self.root.after(0, lambda t=output: summary_label.config(text=t))
+            except Exception as e:
+                print(e)
             self.last_summary = output
         
         threading.Thread(target=lambda: summarize(text), daemon=True).start()
