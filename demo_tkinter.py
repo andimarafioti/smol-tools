@@ -33,8 +33,13 @@ class TextPopupApp:
         
         # Replace the keyboard listener with GlobalHotKeys
         self.keyboard_listener = keyboard.GlobalHotKeys({
-            "<F8>": self.show_chat_window,
-            "<F9>": self.on_f9,
+            "<F1>": lambda: self.show_draft_input(
+                self.root.winfo_x(),
+                self.root.winfo_y(),
+                self.root.winfo_width()
+            ),
+            "<F5>": self.show_chat_window,
+            "<F2>": self.on_f9,
             "<F10>": self.on_f10,
             "<ctrl>+s": self.on_f10 
         })
@@ -53,105 +58,117 @@ class TextPopupApp:
         summary_popup = tk.Toplevel(self.root)
         summary_popup.withdraw()  # Hide the window initially
         self.active_popups.append(summary_popup)
-        summary_popup.title("Summary")
-        summary_popup.configure(bg='#f6f8fa')  # Very light blue-gray background
+        summary_popup.title("Summary Chat")
+        summary_popup.configure(bg='#f6f8fa')
         
-        # Original text section
-        original_frame = tk.Frame(
-            summary_popup, 
-            bg='white',  # Pure white background
-            highlightbackground='#e1e4e8',  # Subtle border color
-            highlightthickness=1,
-            bd=0,
-            relief=tk.FLAT
-        )
-        original_frame.pack(padx=20, pady=(20,10), fill=tk.X)
+        # Set minimum window size
+        summary_popup.minsize(600, 600)
         
-        # Add original text preview with modern styling
-        original_label = tk.Label(
-            original_frame, 
-            text="Original text", 
-            wraplength=300, 
-            justify=tk.LEFT,
-            bg='white',
-            fg='#24292e',  # Dark gray, almost black
-            font=('Segoe UI', 12)
-        )
-        original_label.pack(padx=15, pady=(12,0), anchor='w')
+        # Main container
+        container = tk.Frame(summary_popup, bg='#f6f8fa')
+        container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
         
-        preview = text[:100] + "..." if len(text) > 100 else text
-        preview_label = tk.Label(
-            original_frame, 
-            text=preview, 
-            wraplength=300, 
-            justify=tk.LEFT,
-            bg='white',
-            fg='#586069'  # Medium gray for content
-        )
-        preview_label.pack(padx=15, pady=(5,12), anchor='w')
-        
-        # Summary section
-        summary_frame = tk.Frame(
-            summary_popup, 
+        # Chat display area (top)
+        chat_frame = tk.Frame(
+            container,
             bg='white',
             highlightbackground='#e1e4e8',
             highlightthickness=1,
             bd=0,
             relief=tk.FLAT
         )
-        summary_frame.pack(padx=20, pady=(10,20), fill=tk.X)
+        chat_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
         
-        # Create summary label with matching styling
-        summary_title = tk.Label(
-            summary_frame, 
-            text="Summary", 
-            wraplength=300, 
-            justify=tk.LEFT,
+        # Add chat display with scrollbar
+        chat_display = tk.Text(
+            chat_frame, 
+            wrap=tk.WORD,
+            borderwidth=0,
+            highlightthickness=0,
             bg='white',
             fg='#24292e',
-            font=('Segoe UI', 12)
+            font=('Segoe UI', 12),
+            padx=15,
+            pady=12
         )
-        summary_title.pack(padx=15, pady=(12,0), anchor='w')
+        scrollbar = tk.Scrollbar(chat_frame, command=chat_display.yview)
+        chat_display.configure(yscrollcommand=scrollbar.set)
         
-        summary_label = tk.Label(
-            summary_frame, 
-            text="Generating summary...", 
-            wraplength=300, 
-            justify=tk.LEFT,
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        chat_display.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # Configure text tags
+        chat_display.tag_configure("assistant_name", foreground="#E57373", font=('Segoe UI', 12, 'bold'))
+        chat_display.tag_configure("user_name", foreground="#7986CB", font=('Segoe UI', 12, 'bold'))
+        chat_display.config(state='disabled')
+        
+        # Input area (bottom)
+        input_container = tk.Frame(
+            container,
             bg='white',
-            fg='#586069'
+            highlightbackground='#e1e4e8',
+            highlightthickness=1,
+            bd=0,
+            relief=tk.FLAT
         )
-        summary_label.pack(padx=15, pady=(5,12), anchor='w')
+        input_container.pack(fill=tk.X)
         
-        # Add button frame right away
-        button_frame = tk.Frame(summary_popup, bg='#f6f8fa')
-        button_frame.pack(fill=tk.X, padx=20, pady=(10, 20))
+        # Text input
+        chat_input = tk.Text(
+            input_container, 
+            height=3, 
+            wrap=tk.WORD,
+            borderwidth=0,
+            highlightthickness=0,
+            bg='white',
+            fg='#24292e',
+            font=('Segoe UI', 12),
+            padx=15,
+            pady=12,
+            insertwidth=2,  # Width of cursor
+            insertbackground='#0066FF',  # Color of cursor matching our theme
+            insertofftime=500,  # Cursor blink off time in milliseconds
+            insertontime=500   # Cursor blink on time in milliseconds
+        )
+        chat_input.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
-        # Add styled "Draft Reply?" button using tkmacosx
-        draft_btn = Button(
-            button_frame, 
-            text="✏️   Draft Reply",
-            command=lambda: [
-                self.show_draft_input(summary_popup.winfo_x(), summary_popup.winfo_y(), summary_popup.winfo_width()),
-                summary_popup.destroy()
-            ],
-            font=('Segoe UI', 14),
+        # Send button
+        send_btn = Button(
+            input_container,
+            text="Ask Question",
+            command=lambda: self.process_summary_question(
+                text, chat_input.get("1.0", "end-1c").strip(),
+                chat_display, chat_input
+            ),
+            font=('Segoe UI', 12),
             bg='#0066FF',
             fg='white',
             activebackground='#0052CC',
             activeforeground='white',
             borderless=True,
             focuscolor='',
-            padx=25,
-            pady=10,
-            cursor='hand2'
+            height=32,
+            padx=15
         )
-        draft_btn.pack(side=tk.BOTTOM, pady=(10, 0))
+        send_btn.pack(side=tk.RIGHT, padx=15, pady=8)
         
-        # Position the window before showing content
-        summary_popup.update_idletasks()  # Ensure window dimensions are calculated
-        popup_width = summary_popup.winfo_width()
-        popup_height = summary_popup.winfo_height()
+        # Bind Enter key
+        chat_input.bind("<Return>", lambda e: [
+            self.process_summary_question(
+                text, chat_input.get("1.0", "end-1c").strip(),
+                chat_display, chat_input
+            ),
+            "break"
+        ][1])
+        
+        # Display initial summary request
+        preview = text[:100] + "..." if len(text) > 100 else text
+        self.update_summary_chat(chat_display, self.username, f"Please summarize this text: {preview}")
+        
+        # Position window
+        summary_popup.update_idletasks()
+        popup_width = 600
+        popup_height = 600
         
         # Get mouse position and screen dimensions
         mouse_x = self.root.winfo_pointerx()
@@ -159,27 +176,79 @@ class TextPopupApp:
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         
-        # Calculate x position ensuring window is fully visible
+        # Calculate position
         x = min(max(mouse_x - popup_width//2, 0), screen_width - popup_width)
+        y = min(max(mouse_y - popup_height//2, 0), screen_height - popup_height)
         
-        # For y position, if mouse is in lower half of screen, position window above cursor
-        if mouse_y > screen_height / 2:
-            y = max(mouse_y - popup_height - 20, 0)  # Position above cursor with 20px gap
-        else:
-            y = min(mouse_y + 20, screen_height - popup_height)  # Position below cursor with 20px gap
-        
-        summary_popup.geometry(f"+{x}+{y}")
-        summary_popup.deiconify()  # Show the window in its correct position
+        summary_popup.geometry(f"{popup_width}x{popup_height}+{x}+{y}")
+        summary_popup.deiconify()
         
         def summarize(input_text):
             try:
+                # First message from the model
+                self.root.after(0, lambda: self.update_summary_chat(
+                    chat_display, self.summarizer.name, ""))
+                
+                current_response = ""
                 for output in self.summarizer.process(input_text):
-                    self.root.after(0, lambda t=output: summary_label.config(text=t))
+                    # Only send the new part of the response
+                    if output.startswith(current_response):
+                        new_text = output[len(current_response):]
+                        if new_text:  # Only update if there's new text
+                            current_response = output
+                            self.root.after(0, lambda t=new_text: chat_display.config(state='normal') or 
+                                chat_display.insert("end-1c", t) or 
+                                chat_display.config(state='disabled'))
             except Exception as e:
                 print(e)
-            self.last_summary = output
         
         threading.Thread(target=lambda: summarize(text), daemon=True).start()
+
+    def update_summary_chat(self, chat_display: tk.Text, sender: str, message: str):
+        """Update the summary chat display with new message"""
+        chat_display.config(state='normal')
+        
+        # Add the message with appropriate styling
+        chat_display.insert(tk.END, "\n")  # Add spacing
+        chat_display.insert(tk.END, sender, 
+                        "assistant_name" if sender == self.summarizer.name else "user_name")
+        chat_display.insert(tk.END, f": {message}")
+        
+        chat_display.see(tk.END)
+        chat_display.config(state='disabled')
+
+    def process_summary_question(self, original_text: str, question: str, 
+                               chat_display: tk.Text, chat_input: tk.Text):
+        """Process a follow-up question about the summarized text"""
+        if not question.strip():
+            return
+            
+        # Clear input
+        chat_input.delete("1.0", tk.END)
+        
+        # Display user question
+        self.update_summary_chat(chat_display, self.username, question)
+        
+        def process_question():
+            try:
+                # First message from the model
+                self.root.after(0, lambda: self.update_summary_chat(
+                    chat_display, self.summarizer.name, ""))
+
+                current_response = ""
+                for output in self.summarizer.process(original_text, question=question):
+                    # Only send the new part of the response
+                    if output.startswith(current_response):
+                        new_text = output[len(current_response):]
+                        if new_text:  # Only update if there's new text
+                            current_response = output
+                            self.root.after(0, lambda t=new_text: chat_display.config(state='normal') or 
+                                chat_display.insert("end-1c", t) or 
+                                chat_display.config(state='disabled'))
+            except Exception as e:
+                print(e)
+
+        threading.Thread(target=process_question, daemon=True).start()
 
     def on_f10(self):
         # Show agent input window instead of copying text
@@ -212,7 +281,7 @@ class TextPopupApp:
         draft_popup.title("Draft Reply")
         draft_popup.configure(bg='#f6f8fa')
         
-        # Create frame for the three columns
+        # Create frame for the two columns
         columns_frame = tk.Frame(draft_popup, bg='#f6f8fa')
         columns_frame.pack(expand=True, fill='both', padx=20, pady=20)
         
@@ -221,32 +290,7 @@ class TextPopupApp:
         line_height = max(num_lines * 1.5, 15)
         widget_height = min(line_height, 40) 
         
-        # Column 1: Original Summary
-        summary_frame = tk.Frame(
-            columns_frame,
-            bg='white',
-            highlightbackground='#e1e4e8',
-            highlightthickness=1,
-            bd=0,
-            relief=tk.FLAT
-        )
-        summary_frame.pack(side=tk.LEFT, padx=5, fill='both', expand=True)
-        tk.Label(summary_frame, text="Original Summary", bg='white', fg='#24292e', font=('Segoe UI', 12)).pack(padx=15, pady=(12,0), anchor='w')
-        summary_text = tk.Text(
-            summary_frame, 
-            height=widget_height, 
-            width=30, 
-            wrap=tk.WORD,
-            borderwidth=0,  # Remove border
-            highlightthickness=0,  # Remove highlight border
-            selectbackground='#e1e4e8',  # Very subtle selection color
-            selectforeground='#24292e'  # Keep text readable when selected
-        )
-        summary_text.pack(fill='both', expand=True, padx=15, pady=12)
-        summary_text.insert("1.0", self.last_summary)
-        summary_text.config(state='disabled', bg='white', fg='#586069', font=('Segoe UI', 12))
-        
-        # Column 2: Draft Input
+        # Column 1: Draft Input
         input_frame = tk.Frame(
             columns_frame,
             bg='white',
@@ -262,15 +306,20 @@ class TextPopupApp:
             height=widget_height, 
             width=30, 
             wrap=tk.WORD,
-            borderwidth=0,  # Remove border
-            highlightthickness=0,  # Remove highlight border
-            selectbackground='#e1e4e8',  # Very subtle selection color
-            selectforeground='#24292e'  # Keep text readable when selected
+            borderwidth=0,
+            highlightthickness=0,
+            selectbackground='#e1e4e8',
+            selectforeground='#24292e',
+            insertwidth=2,  # Width of cursor
+            insertbackground='#0066FF',  # Color of cursor matching our theme
+            insertofftime=500,  # Cursor blink off time in milliseconds
+            insertontime=500   # Cursor blink on time in milliseconds
+
         )
         text_input.pack(fill='both', expand=True, padx=15, pady=12)
         text_input.config(bg='white', fg='#24292e', font=('Segoe UI', 12))
         
-        # Column 3: Improved Text
+        # Column 2: Improved Text
         improved_frame = tk.Frame(
             columns_frame,
             bg='white',
@@ -286,10 +335,10 @@ class TextPopupApp:
             height=widget_height, 
             width=30, 
             wrap=tk.WORD,
-            borderwidth=0,  # Remove border
-            highlightthickness=0,  # Remove highlight border
-            selectbackground='#e1e4e8',  # Very subtle selection color
-            selectforeground='#24292e'  # Keep text readable when selected
+            borderwidth=0,
+            highlightthickness=0,
+            selectbackground='#e1e4e8',
+            selectforeground='#24292e'
         )
         improved_text.pack(fill='both', expand=True, padx=15, pady=12)
         improved_text.config(state='disabled', bg='white', fg='#586069', font=('Segoe UI', 12))
@@ -345,7 +394,7 @@ class TextPopupApp:
         summary_center_x = summary_x + summary_width//2
         
         # Center the new window on the same point, but ensure it stays on screen
-        new_x = max(min(max(summary_center_x - popup_width//2, 0), screen_width - popup_width), 0)
+        new_x = max(min(summary_center_x - popup_width//2, screen_width - popup_width), 0)
         # Position vertically based on screen space available
         if summary_y > screen_height / 2:
             new_y = max(summary_y - popup_height - 10, 0)  # 10px gap above summary
@@ -353,7 +402,7 @@ class TextPopupApp:
             new_y = min(summary_y + 10, screen_height - popup_height)  # 10px gap below summary
         
         draft_popup.geometry(f"+{new_x}+{new_y}")
-        draft_popup.deiconify()  # Show in correct position
+        draft_popup.deiconify()
 
     def generate_improved_text(self, text, improved_text_widget):
         # Get reference to the improve button
@@ -380,14 +429,14 @@ class TextPopupApp:
                 # Re-enable button and restore original state after generation is complete
                 self.root.after(0, lambda: improve_btn.config(
                     state='normal',
-                    text="Smol Improvement?",
-                    bg='#0066FF'  # Restore original color
+                    text="Copy",
+                    bg='#0066FF'
                 ))
             except Exception as e:
                 # Make sure to re-enable button even if there's an error
                 self.root.after(0, lambda: improve_btn.config(
                     state='normal',
-                    text="Smol Improvement?",
+                    text="Copy",
                     bg='#0066FF'
                 ))
                 raise e
